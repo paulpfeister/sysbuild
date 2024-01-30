@@ -14,8 +14,10 @@
 ##########################
 #### Development Only ####
 
-$DebugPreference = "Continue"    # Normally SilentlyContinue
-$VerbosePreference = "Continue"  # Normally SilentlyContinue
+$DebugPreference = "Continue"            # Normally SilentlyContinue
+$VerbosePreference = "Continue"          # Normally SilentlyContinue
+$runOnUnix = $true                       # Normally false
+$runOnIncompatibleWin = $true            # Normally false
 
 #### Development Only ####
 ##########################
@@ -47,6 +49,9 @@ $scriptBanner = @"
 
 "@
 
+$sysenv = "$([System.Environment]::OSVersion.Platform)"
+$distrib = "$((Get-WmiObject Win32_OperatingSystem).Caption)"
+
 #### Globals ####
 #################
 #################
@@ -62,17 +67,17 @@ $scriptBanner = @"
 
 # Define options
 $options = @{
-    "OEM de-bloat (by name)" = $true
-    "OEM de-bloat (by GUID)" = $true
+    "OEM de-bloat (by name)" = $false
+    "OEM de-bloat (by GUID)" = $false
     "Metro de-bloat, Microsoft (i.e. Mahjong)" = $true
     "Metro de-bloat, 3rd Party (i.e. LinkedIn)" = $true
-    "Toolbar & BHO Removal (by GUID)" = $true
     "Remove OneDrive" = $true
     "Telemetry disable (quick)" = $true
     "Telemetry disable and dismantle (slow)" = $true
     "Disable system update services" = $false
     "Replace Edge with Firefox" = $false
     "Install winget" = $false
+    "Verbose" = $false
 }
 
 function DisplayMenu {
@@ -93,8 +98,8 @@ function DisplayMenu {
 	
 	$menuOptionLeftPadding = "    "
         
-        # Display menu
-        for ($i = 0; $i -lt $optionEntries.Count; $i++) {
+	# Display menu
+	for ($i = 0; $i -lt $optionEntries.Count; $i++) {
             $option = $optionEntries[$i].Key
             $isSelected = $options[$option] # Get the current state directly from the $options hashtable
             if ($i -eq $selectedIndex) {

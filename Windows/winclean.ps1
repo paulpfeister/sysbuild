@@ -348,7 +348,7 @@ function installWingetIfNotExist {
     } catch {}
 
     # TODO Add winget autoinstaller (return 0 if successful)
-    printErr("replaceEdge: winget does not exist. Install or update Microsoft's App Installer via https://apps.microsoft.com/detail/9NBLGGH4NNS1.")
+    printErr("Some modules unable to run. winget does not exist. Install or update Microsoft's App Installer via https://apps.microsoft.com/detail/9NBLGGH4NNS1.")
     return "winget not installed"
 }
 

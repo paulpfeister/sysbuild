@@ -271,28 +271,24 @@ function OEMDebloatByName {
     Write-Debug "OEMDebloatByName: Leaving job."
 }
 
-function MetroDebloatMS {
-    if (-not $options[$menuItem_MetroDebloatMS]) {
-        return
-    }
-    
+function MetroDebloat($metro_category) {
     # Check if running on compatible edition or version of Windows for this mode
     if (-not $runOnIncompatibleWin) {
         if ($distrib -notmatch "Windows 10" -and $distrib -notmatch "Windows 11") {
-            Write-Verbose "MetroDebloatMS: Skipping due to incompatible Windows edition."
+            Write-Verbose "MetroDebloat: Skipping due to incompatible Windows edition."
             return
         }
     }
 
-    Write-Debug "MetroDebloatMS: Entering job."
+    Write-Debug "MetroDebloat: Entering job."
 
     # Load list of crapware, preferring local copy
     $itemNames = @()
-    if ((Test-Path -Path "defs/metro/microsoft.txt") -and (-not $options[$menuItem_PreferRemoteLists])) {
-        $itemNames = Get-Content -Path "defs/metro/microsoft.txt"
+    if ((Test-Path -Path "defs/metro/${metro_category}.txt") -and (-not $options[$menuItem_PreferRemoteLists])) {
+        $itemNames = Get-Content -Path "defs/metro/${metro_category}.txt"
     } else {
         try {
-            $itemNames = (Invoke-WebRequest -Uri "$manifestRootUri/metro/microsoft.txt").Content
+            $itemNames = (Invoke-WebRequest -Uri "$manifestRootUri/metro/${metro_category}.txt").Content
         } catch {
             Write-Error "Local package manifest or connection to $manifestRootUri needed."
             return
@@ -300,13 +296,13 @@ function MetroDebloatMS {
     }
     filterTargetList([ref]$itemNames)
 
-    Write-Verbose "MetroDebloatMS: Loaded $($itemNames.Count) items by name."
+    Write-Verbose "MetroDebloat: Loaded $($itemNames.Count) items by name (category: $metro_category)."
 
     # Iterate over the loaded manifest, removing each item that exists on the system
     $installed = Get-AppxPackage -AllUsers | Select-Object Name
     $itemNames | ForEach-Object {
         $item = $_
-        Write-Debug "MetroDebloatMS: Attempting to remove $item."
+        Write-Debug "MetroDebloat: Attempting to remove $item."
 
         # UNISNTALLING packages
         $installed = Get-AppxPackage -AllUsers | Select-Object PackageFullName,Name `
@@ -316,7 +312,7 @@ function MetroDebloatMS {
         if ($installed) {
             try {
                 Remove-AppxPackage -Verbose:$false -Package $installed -ErrorAction Stop
-                Write-Verbose "MetroDebloatMS: Removed $item."
+                Write-Verbose "MetroDebloat: Removed $item."
             } catch {
                 Write-Verbose "Failed to remove $item."
             }
@@ -331,25 +327,22 @@ function MetroDebloatMS {
         if ($provisioned) {
             try {
                 Remove-AppxProvisionedPackage -Online -Verbose:$false -PackageName $provisioned -ErrorAction Stop
-                Write-Verbose "MetroDebloatMS: Deprovisioned $item."
+                Write-Verbose "MetroDebloat: Deprovisioned $item."
             } catch {
                 Write-Verbose "Failed to deprovision $item."
             }
             Clear-Variable provisioned
         }
-
-#$provisioned = @()
-#$itemNames | ForEach-Object {
-#    $item = $_
-#    $provisionedPackages = Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -eq $item } | Select-Object -ExpandProperty PackageName
-#    $provisioned += $provisionedPackages
-#}
     }
 
-    Write-Debug "MetroDebloatMS: Leaving job."
+    Write-Debug "MetroDebloat: Leaving job."
 
 }
 
+Write-Host "This can take a while.`n"
+
 setVerbosity
 OEMDebloatByName
-MetroDebloatMS
+
+if ($options[$menuItem_MetroDebloatMS]) { MetroDebloat("microsoft") }
+if ($options[$menuItem_MetroDebloat3P]) { MetroDebloat("thirdparty") }

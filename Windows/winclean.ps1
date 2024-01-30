@@ -56,7 +56,7 @@ if ($sysenv -eq "Win32NT") {
     New-Variable -Scope Script -Name distrib -Option Constant -Value "$((Get-WmiObject Win32_OperatingSystem).Caption)"
 }
 
-New-Variable -Scope Script -Name manifestRootUri -Option Constant -Value "https://raw.githubusercontent.com/paulpfeister/sysbuild/main/defs"
+New-Variable -Scope Script -Name manifestRootUri -Option Constant -Value "https://raw.githubusercontent.com/paulpfeister/sysbuild/master/defs"
 
 #### Globals ####
 #################

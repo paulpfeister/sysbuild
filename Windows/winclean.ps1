@@ -271,8 +271,8 @@ function loadPackageManifest($manifestRelativeLoc) {
     if ((Test-Path -Path "defs/$manifestRelativeLoc.txt") -and (-not $options[$menuItem_PreferRemoteLists])) {
         $itemNames = Get-Content -Path "defs/$manifestRelativeLoc.txt"
     } else {
-        try {
-            $itemNames = (Invoke-WebRequest -Uri "$manifestRootUri/$manifestRelativeLoc.txt" -Verbose:$false).Content
+        try {            
+            $itemNames = ((Invoke-WebRequest -Uri "$manifestRootUri/$manifestRelativeLoc.txt" -Verbose:$true) -split "`n")
         } catch {
             printErr("Local package manifest or connection to $manifestRootUri needed.")
             return

@@ -83,16 +83,16 @@ $menuItem_InstallWinget = "Install winget"
 $menuItem_PreferRemoteLists = "Ignore local program manifest (requires internet)"
 
 $options = @{
-    $menuItem_OEMDebloatByName = $false
-    $menuItem_OEMDebloatByGUID = $false
+    #$menuItem_OEMDebloatByName = $false
+    #$menuItem_OEMDebloatByGUID = $false
     $menuItem_MetroDebloatMS = $true
     $menuItem_MetroDebloat3P = $true
-    $menuItem_RemoveOneDrive = $true
-    $menuItem_TelemetryDisable = $true
-    $menuItem_TelemetryDismantle = $true
-    $menuItem_DisableUpdateServices = $false
+    #$menuItem_RemoveOneDrive = $true
+    #$menuItem_TelemetryDisable = $true
+    #$menuItem_TelemetryDismantle = $true
+    #$menuItem_DisableUpdateServices = $false
     $menuItem_ReplaceEdge = $false
-    $menuItem_InstallWinget = $false
+    #$menuItem_InstallWinget = $false
     $menuItem_SetVerbosity = $false
     $menuItem_PreferRemoteLists = $false
 }

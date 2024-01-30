@@ -14,10 +14,10 @@
 ##########################
 #### Development Only ####
 
-$DebugPreference = "Continue"    # Normally SilentlyContinue
-$VerbosePreference = "Continue"  # Normally SilentlyContinue
-$runOnUnix = $true                      # Normally false
-$runOnIncompatibleWin = $true            # Normally false
+$script:DebugPreference = "SilentlyContinue"    # Normally SilentlyContinue
+$script:VerbosePreference = "SilentlyContinue"  # Normally SilentlyContinue
+$script:runOnUnix = $true                      # Normally false
+$script:runOnIncompatibleWin = $true            # Normally false
 
 #### Development Only ####
 ##########################
@@ -34,7 +34,7 @@ $runOnIncompatibleWin = $true            # Normally false
 #################
 #### Globals ####
 
-$scriptBanner = @"
+New-Variable -Scope Script -Name scriptBanner -Option Constant -Value @"
 	
   <><><><><><><><><><><><><><><><><><><><><><><><>
 <><>                                            <><>
@@ -49,9 +49,9 @@ $scriptBanner = @"
 
 "@
 
-$sysenv = "$([System.Environment]::OSVersion.Platform)"
+New-Variable -Scope Script -Name sysenv -Option Constant -Value "$([System.Environment]::OSVersion.Platform)"
 if ($sysenv -eq "Win32NT") {
-    $distrib = "$((Get-WmiObject Win32_OperatingSystem).Caption)"
+    New-Variable -Scope Script -Name distrib -Option Constant -Value "$((Get-WmiObject Win32_OperatingSystem).Caption)"
 }
 
 #### Globals ####
@@ -67,19 +67,30 @@ if ($sysenv -eq "Win32NT") {
 ###############################
 #### WinCleaner Setup Menu ####
 
-# Define options
+$menuItem_SetVerbosity = "Verbose"
+$menuItem_OEMDebloatByName = "OEM de-bloat (by name)"
+$menuItem_OEMDebloatByGUID = "OEM de-bloat (by GUID)"
+$menuItem_MetroDebloatMS = "Metro de-bloat, Microsoft (i.e. Mahjong)"
+$menuItem_MetroDebloat3P = "Metro de-bloat, 3rd Party (i.e. LinkedIn)"
+$menuItem_RemoveOneDrive = "Remove OneDrive"
+$menuItem_TelemetryDisable = "Telemetry disable (quick)"
+$menuItem_TelemetryDismantle = "Telemetry disable and dismantle (slow)"
+$menuItem_DisableUpdateServices = "Disable system update services"
+$menuItem_ReplaceEdge = "Replace Edge with Firefox"
+$menuItem_InstallWinget = "Install winget"
+
 $options = @{
-    "OEM de-bloat (by name)" = $false
-    "OEM de-bloat (by GUID)" = $false
-    "Metro de-bloat, Microsoft (i.e. Mahjong)" = $true
-    "Metro de-bloat, 3rd Party (i.e. LinkedIn)" = $true
-    "Remove OneDrive" = $true
-    "Telemetry disable (quick)" = $true
-    "Telemetry disable and dismantle (slow)" = $true
-    "Disable system update services" = $false
-    "Replace Edge with Firefox" = $false
-    "Install winget" = $false
-    "Verbose" = $false
+    $menuItem_OEMDebloatByName = $false
+    $menuItem_OEMDebloatByGUID = $false
+    $menuItem_MetroDebloatMS = $true
+    $menuItem_MetroDebloat3P = $true
+    $menuItem_RemoveOneDrive = $true
+    $menuItem_TelemetryDisable = $true
+    $menuItem_TelemetryDismantle = $true
+    $menuItem_DisableUpdateServices = $false
+    $menuItem_ReplaceEdge = $false
+    $menuItem_InstallWinget = $false
+    $menuItem_SetVerbosity = $false
 }
 
 function DisplayMenu {
@@ -91,8 +102,10 @@ function DisplayMenu {
     $Host.UI.RawUI.CursorPosition = New-Object System.Management.Automation.Host.Coordinates(0, 0)
     
     while ($true) {
-        # Clear console window
-        Clear-Host
+        # Clear console window (if not in debug mode)
+        if($DebugPreference -eq "SilentlyContinue") {
+            Clear-Host
+        }
 
 	[console]::CursorVisible = $false
 
@@ -195,6 +208,8 @@ if ($result -ne "Begin") {
     return "Somehow, an invalid result was returned from the menu. Exiting."
 }
 
+
+
 #if ($result -eq "Begin") {
 #    Write-Host "Options after Begin:"
 #    $options.GetEnumerator() | Sort-Object Name | ForEach-Object {
@@ -206,3 +221,49 @@ if ($result -ne "Begin") {
 #    Write-Host "No action selected."
 #}
 
+function setVerbosity {
+    if (-not $options[$menuItem_SetVerbosity]) {
+        return
+    }
+    $script:VerbosePreference = 'Continue'
+    Write-Verbose "SetVerbosity: Higher verbosity enabled."
+}
+
+# The original target lists were prepared for batch scripts. Discard DOS comments and set commands.
+function filterDOSTargetList([ref]$itemNames) {
+    $itemNames.Value = $itemNames.Value `
+    | Where-Object { $_ -notmatch "::" } `
+    | Where-Object { $_ -notmatch "set" } `
+    | Where-Object { $_ -notmatch "rem" }
+}
+
+function OEMDebloatByName {
+    if (-not $options[$menuItem_OEMDebloatByName]) {
+        return
+    }
+    Write-Debug "OEMDebloatByName: Entering job."
+    
+    # Check if running on compatible edition or version of Windows for this mode
+    if (-not $runOnIncompatibleWin) {
+        if ($distrib -notmatch "Windows 10" -and $distrib -notmatch "Windows 11") {
+            Write-Verbose "OEMDebloatByName: Skipping due to incompatible Windows edition."
+            return
+        }
+    }
+
+    # Load list of crapware, preferring local copy
+    $itemNames = @()
+    if (Test-Path -Path "defs/oem/programs_to_target_by_name.txt") {
+        $itemNames = Get-Content -Path "defs/oem/programs_to_target_by_name.txt"
+    } else {
+        $itemNames = (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/paulpfeister/sysbuild/main/defs/oem/programs_to_target_by_name.txt").Content
+    }
+    filterDOSTargetList([ref]$itemNames)
+
+    Write-Verbose "OEMDebloatByName: Removing $($itemNames.Count) items by name."
+
+    Write-Debug "OEMDebloatByName: Leaving job."
+}
+
+setVerbosity
+OEMDebloatByName

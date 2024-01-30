@@ -7,5 +7,5 @@ If the repository can't be cloned but a single file can be moved, the winclean.p
 
 Alternatively, this snippet can be ran on the target machine (via an elevated shell) to run WinClean without any temporary files.
 ```ps
-iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/paulpfeister/sysbuild/master/Windows/winclean.ps1'))
+iex (iwr 'https://raw.githubusercontent.com/paulpfeister/sysbuild/master/Windows/winclean.ps1')
 ```

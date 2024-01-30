@@ -39,7 +39,7 @@ New-Variable -Scope Script -Name scriptBanner -Option Constant -Value @"
   <><><><><><><><><><><><><><><><><><><><><><><><>
 <><>                                            <><>
 <>                   WinCleaner                   <>
-<>      Clense Windows of telemtry and bloat      <>
+<>     Windows bloat and telemetry mitigation     <>
 <>                                                <>
 <>    https://github.com/paulpfeister/sysbuild    <>
 <><>                                            <><>
@@ -76,11 +76,12 @@ $menuItem_MetroDebloatMS = "Metro de-bloat, Microsoft (i.e. Mahjong)"
 $menuItem_MetroDebloat3P = "Metro de-bloat, 3rd Party (i.e. LinkedIn)"
 $menuItem_RemoveOneDrive = "Remove OneDrive"
 $menuItem_TelemetryDisable = "Telemetry disable (quick)"
-$menuItem_TelemetryDismantle = "Telemetry disable and dismantle (slow)"
+$menuItem_TelemetryDismantle = "Telemetry raze (slow)"
 $menuItem_DisableUpdateServices = "Disable system update services"
-$menuItem_ReplaceEdge = "Replace Edge with Firefox"
-$menuItem_InstallWinget = "Install winget"
-$menuItem_PreferRemoteLists = "Ignore local program manifest (requires internet)"
+$menuItem_ReplaceEdge = "Replace Edge with Firefox (requires winget)"
+$menuItem_InstallWinget = "Install winget" #TODO Add winget installer
+$menuItem_wingetPurge = "Debloat Windows App Installer (requires winget)"
+$menuItem_PreferRemoteLists = "Ignore local package manifests (requires internet)"
 
 $options = @{
     #$menuItem_OEMDebloatByName = $false
@@ -91,10 +92,11 @@ $options = @{
     #$menuItem_TelemetryDisable = $true
     #$menuItem_TelemetryDismantle = $true
     #$menuItem_DisableUpdateServices = $false
-    $menuItem_ReplaceEdge = $false
+    #$menuItem_ReplaceEdge = $false
     #$menuItem_InstallWinget = $false
     $menuItem_SetVerbosity = $false
     $menuItem_PreferRemoteLists = $false
+    $menuItem_wingetPurge = $true
 }
 
 function DisplayMenu {
@@ -185,19 +187,22 @@ function DisplayMenu {
     #######################
 
 
-
-
-    ####################
-  ########################
-############################    
-############################
-#### Run all the things ####
+# Because Write-Error annoyingly has no option to disable stack trace
+function printErr($message) {
+    $originalForegroundColor = (get-host).ui.rawui.ForegroundColor
+    $originalBackgroundColor = (get-host).ui.rawui.BackgroundColor
+    [console]::ForegroundColor = "Red"
+    [console]::BackgroundColor = "Black"
+    [console]::Error.WriteLine($message)
+    [console]::ForegroundColor = $originalForegroundColor
+    [console]::BackgroundColor = $originalBackgroundColor
+}
 
 if ($sysenv -ne "Win32NT") {
     if ($sysenv -eq "Unix" -and $runOnUnix) {
     } else {
         Write-Host $scriptBanner
-        return "This script is intended to run on Windows only. Exiting."
+        prinErr("This script is intended to run on Windows only. Exiting.")
     }
 }
 
@@ -211,19 +216,6 @@ if ($result -eq "Cancel") {
 if ($result -ne "Begin") {
     return "Somehow, an invalid result was returned from the menu. Exiting."
 }
-
-
-
-#if ($result -eq "Begin") {
-#    Write-Host "Options after Begin:"
-#    $options.GetEnumerator() | Sort-Object Name | ForEach-Object {
-#        Write-Host "$($_.Key): $($_.Value)"
-#    }
-#} elseif ($result -eq "Cancel") {
-#    Write-Host "Cancel action selected."
-#} else {
-#    Write-Host "No action selected."
-#}
 
 function setVerbosity {
     if (-not $options[$menuItem_SetVerbosity]) {
@@ -250,7 +242,7 @@ function OEMDebloatByName {
     # Check if running on compatible edition or version of Windows for this mode
     if (-not $runOnIncompatibleWin) {
         if ($distrib -notmatch "Windows 10" -and $distrib -notmatch "Windows 11") {
-            Write-Verbose "OEMDebloatByName: Skipping due to incompatible Windows edition."
+            printErr("OEMDebloatByName: Skipping due to incompatible Windows edition.")
             return
         }
     }
@@ -271,11 +263,28 @@ function OEMDebloatByName {
     Write-Debug "OEMDebloatByName: Leaving job."
 }
 
+function loadPackageManifest($manifestRelativeLoc) {
+    # Load package manifests given their relative path, preferring local copy (typically "{category}/{name}")
+    $itemNames = @('')
+    if ((Test-Path -Path "defs/$manifestRelativeLoc.txt") -and (-not $options[$menuItem_PreferRemoteLists])) {
+        $itemNames = Get-Content -Path "defs/$manifestRelativeLoc.txt"
+    } else {
+        try {
+            $itemNames = (Invoke-WebRequest -Uri "$manifestRootUri/$manifestRelativeLoc.txt" -Verbose:$false).Content
+        } catch {
+            printErr("Local package manifest or connection to $manifestRootUri needed.")
+            return
+        }
+    }
+    filterTargetList([ref]$itemNames)
+    return $itemNames
+}
+
 function MetroDebloat($metro_category) {
     # Check if running on compatible edition or version of Windows for this mode
     if (-not $runOnIncompatibleWin) {
         if ($distrib -notmatch "Windows 10" -and $distrib -notmatch "Windows 11") {
-            Write-Verbose "MetroDebloat: Skipping due to incompatible Windows edition."
+            printErr("MetroDebloat: Skipping due to incompatible Windows edition.")
             return
         }
     }
@@ -283,18 +292,8 @@ function MetroDebloat($metro_category) {
     Write-Debug "MetroDebloat: Entering job."
 
     # Load list of crapware, preferring local copy
-    $itemNames = @()
-    if ((Test-Path -Path "defs/metro/${metro_category}.txt") -and (-not $options[$menuItem_PreferRemoteLists])) {
-        $itemNames = Get-Content -Path "defs/metro/${metro_category}.txt"
-    } else {
-        try {
-            $itemNames = (Invoke-WebRequest -Uri "$manifestRootUri/metro/${metro_category}.txt").Content
-        } catch {
-            Write-Error "Local package manifest or connection to $manifestRootUri needed."
-            return
-        }
-    }
-    filterTargetList([ref]$itemNames)
+    $itemNames = loadPackageManifest "metro/$metro_category"
+    
 
     Write-Verbose "MetroDebloat: Loaded $($itemNames.Count) items by name (category: $metro_category)."
 
@@ -314,7 +313,7 @@ function MetroDebloat($metro_category) {
                 Remove-AppxPackage -Verbose:$false -Package $installed -ErrorAction Stop
                 Write-Verbose "MetroDebloat: Removed $item."
             } catch {
-                Write-Verbose "Failed to remove $item."
+                printErr("MetroDebloat: Failed to remove $item.")
             }
             Clear-Variable installed
         }
@@ -329,7 +328,7 @@ function MetroDebloat($metro_category) {
                 Remove-AppxProvisionedPackage -Online -Verbose:$false -PackageName $provisioned -ErrorAction Stop
                 Write-Verbose "MetroDebloat: Deprovisioned $item."
             } catch {
-                Write-Verbose "Failed to deprovision $item."
+                printErr("MetroDebloat: Failed to deprovision $item.")
             }
             Clear-Variable provisioned
         }
@@ -339,10 +338,78 @@ function MetroDebloat($metro_category) {
 
 }
 
+function installWingetIfNotExist {
+    # Return early if winget exists
+    try {
+        winget --version | Out-Null
+        return 0
+    } catch {}
+
+    # TODO Add winget autoinstaller (return 0 if successful)
+    printErr("replaceEdge: winget does not exist. Install or update Microsoft's App Installer via https://apps.microsoft.com/detail/9NBLGGH4NNS1.")
+    return "winget not installed"
+}
+
+function purgeWinget {
+    if (-not $options[$menuItem_wingetPurge]) { return }
+    if (-not $runOnIncompatibleWin) {
+        if ($distrib -notmatch "Windows 10" -and $distrib -notmatch "Windows 11") {
+            printErr("MetroDebloat: Skipping due to incompatible Windows edition.")
+            return
+        }
+    }
+    if ((installWingetIfNotExist)) { return }
+
+    Write-Debug "purgeWinget: Entering job."
+
+    $itemNames = loadPackageManifest "winget/remove-by-name"
+    Write-Verbose "purgeWinget: Loaded $($itemNames.Count) items by name (category: purgeByName)."    
+
+    $itemNames | ForEach-Object {
+        $item = $_
+        $installed = winget list | Select-String -Pattern $item | Select-Object -ExpandProperty LineNumber
+        if ($installed) {
+            try {
+                $out = winget uninstall --name $item --silent --force --purge --accept-source-agreements --disable-interactivity
+                if ($out -eq "No installed package found matching input criteria.") {
+                    throw "No installed package found matching input criteria."
+                }
+                Write-Verbose "purgeWinget: Removed: $item."
+            } catch {
+                printErr("purgeWinget: Failed to remove $item.")
+            }
+            Clear-Variable installed
+        } else {
+            Write-Verbose "purgeWinget: Absent: $item"
+        }
+    }
+
+    Write-Verbose "purgeWinget: Cleaning up registry."
+    try {
+        $out = reg import defs/winget/housekeeping.reg
+        if ($out -ne "The operation completed successfully.") {
+            throw "something went wrong with reg import?"
+        }
+        Write-Verbose "purgeWinget: Cleaned up registry."
+    } catch {
+        printErr("purgeWinget: Failed to clean up registry. Does the definition exist locally? Remote sourcing is disabled.")
+    }
+
+    Write-Debug "purgeWinget: Leaving job."
+}
+
+
+
+    ####################
+  ########################
+############################    
+############################
+#### Run all the things ####
+
 Write-Host "This can take a while.`n"
 
 setVerbosity
 OEMDebloatByName
-
 if ($options[$menuItem_MetroDebloatMS]) { MetroDebloat("microsoft") }
 if ($options[$menuItem_MetroDebloat3P]) { MetroDebloat("thirdparty") }
+purgeWinget

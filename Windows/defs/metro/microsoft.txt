@@ -53,6 +53,7 @@ Microsoft.MicrosoftSudoku
 Microsoft.MicrosoftTreasureHunt
 Microsoft.MinecraftUWP
 Microsoft.MovieMoments
+Microsoft.MSPaint
 Microsoft.NetworkSpeedTest
 Microsoft.Office.Sway
 Microsoft.OneConnect

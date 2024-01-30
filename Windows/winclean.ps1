@@ -8,6 +8,8 @@
 #
 # WARRANTY   : No warranty provided whatsoever. Use at your own risk. See license.
 
+#Requires -RunAsAdministrator
+
     ##################
   ######################
 ##########################

@@ -48,6 +48,7 @@ Microsoft.MicrosoftMahjong
 Microsoft.MicrosoftOfficeHub
 Microsoft.MicrosoftPowerBIForWindows
 Microsoft.MicrosoftRewards
+Microsoft.MicrosoftSolitaireCollection
 Microsoft.MicrosoftSudoku
 Microsoft.MicrosoftTreasureHunt
 Microsoft.MinecraftUWP

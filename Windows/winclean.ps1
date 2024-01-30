@@ -14,9 +14,9 @@
 ##########################
 #### Development Only ####
 
-$DebugPreference = "Continue"            # Normally SilentlyContinue
-$VerbosePreference = "Continue"          # Normally SilentlyContinue
-$runOnUnix = $true                       # Normally false
+$DebugPreference = "Continue"    # Normally SilentlyContinue
+$VerbosePreference = "Continue"  # Normally SilentlyContinue
+$runOnUnix = $true                      # Normally false
 $runOnIncompatibleWin = $true            # Normally false
 
 #### Development Only ####
@@ -50,7 +50,9 @@ $scriptBanner = @"
 "@
 
 $sysenv = "$([System.Environment]::OSVersion.Platform)"
-$distrib = "$((Get-WmiObject Win32_OperatingSystem).Caption)"
+if ($sysenv -eq "Win32NT") {
+    $distrib = "$((Get-WmiObject Win32_OperatingSystem).Caption)"
+}
 
 #### Globals ####
 #################
@@ -168,15 +170,39 @@ function DisplayMenu {
 
 
 
-$result = DisplayMenu
-if ($result -eq "Begin") {
-    Write-Host "Options after Begin:"
-    $options.GetEnumerator() | Sort-Object Name | ForEach-Object {
-        Write-Host "$($_.Key): $($_.Value)"
+    ####################
+  ########################
+############################    
+############################
+#### Run all the things ####
+
+if ($sysenv -ne "Win32NT") {
+    if ($sysenv -eq "Unix" -and $runOnUnix) {
+    } else {
+        Write-Host $scriptBanner
+        return "This script is intended to run on Windows only. Exiting."
     }
-} elseif ($result -eq "Cancel") {
-    Write-Host "Cancel action selected."
-} else {
-    Write-Host "No action selected."
 }
+
+$result = DisplayMenu
+
+if ($result -eq "Cancel") {
+    Write-Host "No action taken.`n"
+    return
+}
+
+if ($result -ne "Begin") {
+    return "Somehow, an invalid result was returned from the menu. Exiting."
+}
+
+#if ($result -eq "Begin") {
+#    Write-Host "Options after Begin:"
+#    $options.GetEnumerator() | Sort-Object Name | ForEach-Object {
+#        Write-Host "$($_.Key): $($_.Value)"
+#    }
+#} elseif ($result -eq "Cancel") {
+#    Write-Host "Cancel action selected."
+#} else {
+#    Write-Host "No action selected."
+#}
 

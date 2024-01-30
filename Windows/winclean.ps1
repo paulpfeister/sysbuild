@@ -272,7 +272,7 @@ function loadPackageManifest($manifestRelativeLoc) {
         $itemNames = Get-Content -Path "defs/$manifestRelativeLoc.txt"
     } else {
         try {            
-            $itemNames = ((Invoke-WebRequest -Uri "$manifestRootUri/$manifestRelativeLoc.txt" -Verbose:$true) -split "`n")
+            $itemNames = ((Invoke-WebRequest -Uri "$manifestRootUri/$manifestRelativeLoc.txt" -Verbose:$false) -split "`n")
         } catch {
             printErr("Local package manifest or connection to $manifestRootUri needed.")
             return
@@ -313,7 +313,7 @@ function MetroDebloat($metro_category) {
         if ($installed) {
             try {
                 Remove-AppxPackage -Verbose:$false -Package $installed -ErrorAction Stop
-                Write-Verbose "MetroDebloat: Removed $item."
+                Write-Verbose "MetroDebloat: Removed: $item."
             } catch {
                 printErr("MetroDebloat: Failed to remove $item.")
             }
@@ -327,8 +327,8 @@ function MetroDebloat($metro_category) {
 
         if ($provisioned) {
             try {
-                Remove-AppxProvisionedPackage -Online -Verbose:$false -PackageName $provisioned -ErrorAction Stop
-                Write-Verbose "MetroDebloat: Deprovisioned $item."
+                Remove-AppxProvisionedPackage -Online -Verbose:$false -PackageName $provisioned -ErrorAction Stop | Out-Null
+                Write-Verbose "MetroDebloat: Deprovisioned: $item."
             } catch {
                 printErr("MetroDebloat: Failed to deprovision $item.")
             }

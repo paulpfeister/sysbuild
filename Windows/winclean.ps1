@@ -54,6 +54,8 @@ if ($sysenv -eq "Win32NT") {
     New-Variable -Scope Script -Name distrib -Option Constant -Value "$((Get-WmiObject Win32_OperatingSystem).Caption)"
 }
 
+New-Variable -Scope Script -Name manifestRootUri -Option Constant -Value "https://raw.githubusercontent.com/paulpfeister/sysbuild/main/defs"
+
 #### Globals ####
 #################
 #################
@@ -78,6 +80,7 @@ $menuItem_TelemetryDismantle = "Telemetry disable and dismantle (slow)"
 $menuItem_DisableUpdateServices = "Disable system update services"
 $menuItem_ReplaceEdge = "Replace Edge with Firefox"
 $menuItem_InstallWinget = "Install winget"
+$menuItem_PreferRemoteLists = "Ignore local program manifest (requires internet)"
 
 $options = @{
     $menuItem_OEMDebloatByName = $false
@@ -91,6 +94,7 @@ $options = @{
     $menuItem_ReplaceEdge = $false
     $menuItem_InstallWinget = $false
     $menuItem_SetVerbosity = $false
+    $menuItem_PreferRemoteLists = $false
 }
 
 function DisplayMenu {
@@ -230,18 +234,18 @@ function setVerbosity {
 }
 
 # The original target lists were prepared for batch scripts. Discard DOS comments and set commands.
-function filterDOSTargetList([ref]$itemNames) {
+function filterTargetList([ref]$itemNames) {
     $itemNames.Value = $itemNames.Value `
     | Where-Object { $_ -notmatch "::" } `
     | Where-Object { $_ -notmatch "set" } `
-    | Where-Object { $_ -notmatch "rem" }
+    | Where-Object { $_ -notmatch "rem" } `
+    | Where-Object { $_ -notmatch "#" }
 }
 
 function OEMDebloatByName {
     if (-not $options[$menuItem_OEMDebloatByName]) {
         return
     }
-    Write-Debug "OEMDebloatByName: Entering job."
     
     # Check if running on compatible edition or version of Windows for this mode
     if (-not $runOnIncompatibleWin) {
@@ -251,19 +255,101 @@ function OEMDebloatByName {
         }
     }
 
+    Write-Debug "OEMDebloatByName: Entering job."
+
     # Load list of crapware, preferring local copy
     $itemNames = @()
-    if (Test-Path -Path "defs/oem/programs_to_target_by_name.txt") {
+    if (Test-Path -Path "defs/oem/programs_to_target_by_name.txt" -and -not $options[$menuItem_PreferRemoteLists]) {
         $itemNames = Get-Content -Path "defs/oem/programs_to_target_by_name.txt"
     } else {
-        $itemNames = (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/paulpfeister/sysbuild/main/defs/oem/programs_to_target_by_name.txt").Content
+        $itemNames = (Invoke-WebRequest -Uri "$manifestRootUri/oem/programs_to_target_by_name.txt").Content
     }
-    filterDOSTargetList([ref]$itemNames)
+    filterTargetList([ref]$itemNames)
 
     Write-Verbose "OEMDebloatByName: Removing $($itemNames.Count) items by name."
-
+    Write-Verbose "OEMDebloatByName: Job not yet implemented."
     Write-Debug "OEMDebloatByName: Leaving job."
+}
+
+function MetroDebloatMS {
+    if (-not $options[$menuItem_MetroDebloatMS]) {
+        return
+    }
+    
+    # Check if running on compatible edition or version of Windows for this mode
+    if (-not $runOnIncompatibleWin) {
+        if ($distrib -notmatch "Windows 10" -and $distrib -notmatch "Windows 11") {
+            Write-Verbose "MetroDebloatMS: Skipping due to incompatible Windows edition."
+            return
+        }
+    }
+
+    Write-Debug "MetroDebloatMS: Entering job."
+
+    # Load list of crapware, preferring local copy
+    $itemNames = @()
+    if ((Test-Path -Path "defs/metro/microsoft.txt") -and (-not $options[$menuItem_PreferRemoteLists])) {
+        $itemNames = Get-Content -Path "defs/metro/microsoft.txt"
+    } else {
+        try {
+            $itemNames = (Invoke-WebRequest -Uri "$manifestRootUri/metro/microsoft.txt").Content
+        } catch {
+            Write-Error "Local package manifest or connection to $manifestRootUri needed."
+            return
+        }
+    }
+    filterTargetList([ref]$itemNames)
+
+    Write-Verbose "MetroDebloatMS: Loaded $($itemNames.Count) items by name."
+
+    # Iterate over the loaded manifest, removing each item that exists on the system
+    $installed = Get-AppxPackage -AllUsers | Select-Object Name
+    $itemNames | ForEach-Object {
+        $item = $_
+        Write-Debug "MetroDebloatMS: Attempting to remove $item."
+
+        # UNISNTALLING packages
+        $installed = Get-AppxPackage -AllUsers | Select-Object PackageFullName,Name `
+        | Where-Object Name -eq $item `
+        | Select-Object -ExpandProperty PackageFullName
+
+        if ($installed) {
+            try {
+                Remove-AppxPackage -Verbose:$false -Package $installed -ErrorAction Stop
+                Write-Verbose "MetroDebloatMS: Removed $item."
+            } catch {
+                Write-Verbose "Failed to remove $item."
+            }
+            Clear-Variable installed
+        }
+
+        # DEPROVISIONING packages
+        $provisioned = Get-AppxProvisionedPackage -Online -Verbose:$false `
+        | Where-Object DisplayName -eq $item `
+        | Select-Object -ExpandProperty PackageName
+
+        if ($provisioned) {
+            try {
+                Remove-AppxProvisionedPackage -Online -Verbose:$false -PackageName $provisioned -ErrorAction Stop
+                Write-Verbose "MetroDebloatMS: Deprovisioned $item."
+            } catch {
+                Write-Verbose "Failed to deprovision $item."
+            }
+            Clear-Variable provisioned
+        }
+
+#$provisioned = @()
+#$itemNames | ForEach-Object {
+#    $item = $_
+#    $provisionedPackages = Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -eq $item } | Select-Object -ExpandProperty PackageName
+#    $provisioned += $provisionedPackages
+#}
+    }
+
+    Write-Debug "MetroDebloatMS: Leaving job."
+
 }
 
 setVerbosity
 OEMDebloatByName
+MetroDebloatMS

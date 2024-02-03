@@ -63,7 +63,8 @@ function debloatAppx {
     #>
     param (
         [Parameter(Position=0,Mandatory=$true)] [string] $Manifest,
-        [Parameter(Position=1,Mandatory=$false)] [switch] $runOnIncompatible = $false
+        [Parameter(Position=1,Mandatory=$false)] [int] $ThrottleLimit = 5,
+        [Parameter(Position=2,Mandatory=$false)] [switch] $runOnIncompatible = $false
     )
 
     # Check if running on compatible edition or version of Windows for this mode
@@ -80,10 +81,11 @@ function debloatAppx {
     Write-Verbose "debloatAppx: Loaded $($itemNames.Count) items by name from manifest $Manifest."
 
     # Iterate over the loaded manifest, removing each item that exists on the system
-    #$installed = Get-AppxPackage -AllUsers | Select-Object Name
-    $itemNames | Foreach-Object -ThrottleLimit 5 -AsJob -Parallel {
+    $itemNames | Foreach-Object -ThrottleLimit $ThrottleLimit -AsJob -Parallel {
         
-        $singletRemover = {    
+        $singletRemover = {
+            # currently written to work with PowerShell 5 (and NOT 7), but this can likely be rewritten to work with 7 if using Import-Module AppX -UserWindowsPowerShell
+            $script:VerbosePreference = "VERBOSITY_PLACEHOLDER"
             # UNISNTALLING packages
             try {
                 $installed = Get-AppxPackage -AllUsers -ErrorAction Stop | Select-Object PackageFullName,Name `
@@ -128,13 +130,13 @@ function debloatAppx {
         Write-Verbose "debloatAppx is attempting to remove $_"
         try {
             # why does powershell suck so much
-            $singletRemover = [ScriptBlock]::Create(($singletRemover.tostring() -replace "PACKAGE_PLACEHOLDER", $_))
+            $singletRemover = [ScriptBlock]::Create(($singletRemover.tostring() -replace "PACKAGE_PLACEHOLDER", $_ -replace "VERBOSITY_PLACEHOLDER", $VerbosePreference))
             # unless you know EXACTLY what to do to fix this so we can use variables, don't touch it. just leave it be. it's working finally. sort of.
             Invoke-Expression -Command "powershell -ExecutionPolicy Bypass -Command {$singletRemover}"
         } catch {
             Write-Error("Failed to remove AppX package $_. idk why. this section is a mess. maybe try prayer or something.")
         }
-    } | Watch-Job -AutoRemoveJob -Delay 5
+    } | Wait-Job | Receive-Job
     Write-Debug "debloatAppx: Leaving job."
 }
 

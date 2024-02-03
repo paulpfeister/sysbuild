@@ -24,7 +24,7 @@
 	https://gist.github.com/ave9858/c3451d9f452389ac7607c99d45edecc6
 #>
 
-#Require -Version 5.1
+#Requires -Version 5.1
 
 param (
 	[switch]$UninstallAll,

@@ -1,8 +1,0 @@
-devel 1.1   + feature       Add winget removal module with basic registry cleanup
-devel 1.0   + feature       Mostly functional metro debloat modules
-devel 0.2   + feature       Basic compatibility logic
-devel 0.1   + feature       System environment detection
-            - feature       Toolbar & BHO menu option
-            * improvement   Set sane menu defaults
-            * improvement   Reorganized files
-devel 0.0   + feature       Menu
